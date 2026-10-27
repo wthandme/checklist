@@ -5,6 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>wthandme ♡ Price Checker</title>
+
 <style>
 :root {
   --pink:#f8d9e7;
@@ -45,10 +46,17 @@ label { display:block; margin:12px 0 6px; font-size:14px; }
 input {
   width:100%; padding:12px; border:1px solid #ecdce6;
   border-radius:12px; font-size:15px; background:#fffafd;
+  color:var(--ink);
 }
+button { cursor:pointer; font-family:inherit; }
+button:disabled { opacity:.6; cursor:wait; }
 button.primary {
   background:#d987ad; color:white; border:0; border-radius:12px;
-  padding:12px 16px; cursor:pointer; font-weight:bold;
+  padding:12px 16px; font-weight:bold;
+}
+button.secondary {
+  background:#f7e9f1; color:var(--ink); border:0;
+  border-radius:12px; padding:10px 14px;
 }
 .full { width:100%; margin-top:15px; }
 .product h3 { margin:0 0 8px; overflow-wrap:anywhere; }
@@ -56,29 +64,58 @@ button.primary {
 .price { color:#9874be; }
 .receive { color:#399779; font-size:20px; font-weight:bold; }
 .meta { color:var(--muted); font-size:13px; }
-.actions { display:flex; gap:8px; margin-top:12px; }
+.actions { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
 .actions button {
   border:0; border-radius:10px; padding:9px 12px;
-  background:#f7e9f1; color:var(--ink); cursor:pointer;
+  background:#f7e9f1; color:var(--ink);
 }
 .empty { text-align:center; color:var(--muted); padding:24px; }
-.hidden { display:none; }
+.hidden { display:none !important; }
+.status { font-size:13px; color:var(--muted); margin-top:8px; }
+.owner-bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.owner-bar button { margin-top:0; }
+.notice {
+  background:#fffafd; border:1px dashed #e8c9da;
+  border-radius:12px; padding:12px; font-size:13px;
+}
 </style>
 </head>
+
 <body>
 <main>
 <header>
   <h1>♡ wthandme ♡</h1>
   <p>Pastel Price Checker · เช็กราคาสินค้าสุดคิวต์</p>
+  <div class="owner-bar" style="justify-content:center">
+    <button id="showLogin" class="secondary" type="button">
+      🔐 เข้าสู่ระบบเจ้าของเว็บ
+    </button>
+    <button id="logoutBtn" class="secondary hidden" type="button">
+      ออกจากระบบ
+    </button>
+  </div>
+  <p id="authStatus" class="status">กำลังเชื่อมต่อ...</p>
 </header>
 
-<div class="tabs">
-  <button class="tab active" data-platform="shopee">🧡 ชป.</button>
-  <button class="tab" data-platform="lazada">💜 ลซด.</button>
-  <button class="tab" data-platform="tiktok">🩵 ตต.</button>
-</div>
+<section id="loginPanel" class="panel hidden">
+  <h2>เข้าสู่ระบบเจ้าของเว็บ ♡</h2>
+  <form id="loginForm">
+    <label for="loginEmail">อีเมลบัญชีเจ้าของ</label>
+    <input id="loginEmail" type="email" autocomplete="username"
+      placeholder="อีเมลที่ลงทะเบียนใน Supabase" required>
 
-<section class="panel">
+    <label for="loginPassword">รหัสผ่าน</label>
+    <input id="loginPassword" type="password"
+      autocomplete="current-password" placeholder="รหัสผ่าน" required>
+
+    <button class="primary full" id="loginBtn" type="submit">
+      เข้าสู่ระบบ
+    </button>
+    <p id="loginMessage" class="status" role="status"></p>
+  </form>
+</section>
+
+<section id="adminPanel" class="panel hidden">
   <h2 id="formTitle">เพิ่มสินค้า · Shopee</h2>
   <form id="productForm">
     <label for="productName">ชื่อสินค้า</label>
@@ -88,45 +125,76 @@ button.primary {
     <input id="productUrl" type="url" placeholder="https://..." required>
 
     <label for="productPrice">ราคาสินค้า (บาท)</label>
-    <input id="productPrice" type="number" min="0" step="0.01" placeholder="4550" required>
+    <input id="productPrice" type="number" min="0" step="0.01"
+      placeholder="4550" required>
 
     <label for="receivePrice">ยอดรับเงิน (บาท)</label>
-    <input id="receivePrice" type="number" min="0" step="0.01" placeholder="3200" required>
+    <input id="receivePrice" type="number" min="0" step="0.01"
+      placeholder="3200" required>
 
     <label for="productImage">ลิงก์รูปสินค้า (ถ้ามี)</label>
     <input id="productImage" type="url" placeholder="https://.../image.jpg">
 
-    <button class="primary full" type="submit">♡ บันทึกสินค้า</button>
+    <button class="primary full" id="saveBtn" type="submit">
+      ♡ บันทึกสินค้า
+    </button>
+    <button class="secondary full hidden" id="cancelEditBtn" type="button">
+      ยกเลิกการแก้ไข
+    </button>
+    <p id="formMessage" class="status" role="status"></p>
   </form>
 </section>
 
+<div class="tabs">
+  <button class="tab active" data-platform="shopee" type="button">🧡 ชป.</button>
+  <button class="tab" data-platform="lazada" type="button">💜 ลซด.</button>
+  <button class="tab" data-platform="tiktok" type="button">🩵 ตต.</button>
+</div>
+
 <h2 id="listTitle">สินค้าจาก Shopee</h2>
+<p id="listStatus" class="status" role="status">กำลังโหลดสินค้า...</p>
 <div id="productList"></div>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+/*
+  ใช้เฉพาะ Project URL และ Publishable/anon key
+  ห้ามนำ service_role หรือ Secret key มาใส่ในหน้าเว็บ
+*/
+const SUPABASE_URL = "https://wtclbenxrwongioieicm.supabase.co";
+const SUPABASE_KEY = "sb_publishable_stXr5HUGjYFGtOaMCdpHOA_VT-D_6Cq";
+
+/* UID เจ้าของที่ตั้ง RLS ไว้ใน Supabase */
+const OWNER_UID = "c1bb2701-63f8-4171-8f41-5e396c2740b8";
+
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 const platforms = {
   shopee: {name:"Shopee", title:"ชป."},
   lazada: {name:"Lazada", title:"ลซด."},
   tiktok: {name:"TikTok Shop", title:"ตต."}
 };
+
 let current = "shopee";
 let products = [];
-
-try {
-  products = JSON.parse(localStorage.getItem("wthandme-products") || "[]");
-  if (!Array.isArray(products)) products = [];
-} catch {
-  products = [];
-}
+let isOwner = false;
+let editingId = null;
+let busy = false;
 
 const $ = id => document.getElementById(id);
-const money = n => Number(n).toLocaleString("th-TH", {
+const money = n => Number(n || 0).toLocaleString("th-TH", {
   maximumFractionDigits:2
 });
 
-function save() {
-  localStorage.setItem("wthandme-products", JSON.stringify(products));
+function setStatus(id, message) {
+  $(id).textContent = message || "";
+}
+
+function setBusy(value) {
+  busy = value;
+  $("saveBtn").disabled = value;
+  $("loginBtn").disabled = value;
 }
 
 function switchTab(platform) {
@@ -134,7 +202,9 @@ function switchTab(platform) {
   document.querySelectorAll(".tab").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.platform === current);
   });
-  $("formTitle").textContent = "เพิ่มสินค้า · " + platforms[current].name;
+  $("formTitle").textContent =
+    (editingId ? "แก้ไขสินค้า · " : "เพิ่มสินค้า · ") +
+    platforms[current].name;
   $("listTitle").textContent = "สินค้าจาก " + platforms[current].name;
   render();
 }
@@ -143,39 +213,197 @@ document.querySelectorAll(".tab").forEach(btn => {
   btn.addEventListener("click", () => switchTab(btn.dataset.platform));
 });
 
-$("productForm").addEventListener("submit", event => {
-  event.preventDefault();
+function resetProductForm() {
+  editingId = null;
+  $("productForm").reset();
+  $("formTitle").textContent = "เพิ่มสินค้า · " + platforms[current].name;
+  $("saveBtn").textContent = "♡ บันทึกสินค้า";
+  $("cancelEditBtn").classList.add("hidden");
+  setStatus("formMessage", "");
+}
 
-  products.unshift({
-    id: Date.now().toString() + Math.random().toString(36).slice(2),
-    platform: current,
-    name: $("productName").value.trim(),
-    url: $("productUrl").value.trim(),
-    price: Number($("productPrice").value),
-    receive: Number($("receivePrice").value),
-    image: $("productImage").value.trim()
-  });
+$("cancelEditBtn").addEventListener("click", resetProductForm);
+
+$("showLogin").addEventListener("click", () => {
+  $("loginPanel").classList.toggle("hidden");
+});
+
+$("loginForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  if (busy) return;
+
+  setBusy(true);
+  setStatus("loginMessage", "กำลังเข้าสู่ระบบ...");
 
   try {
-    save();
-  } catch {
-    alert("บันทึกไม่สำเร็จ พื้นที่จัดเก็บของเบราว์เซอร์อาจเต็ม");
+    const {error} = await db.auth.signInWithPassword({
+      email: $("loginEmail").value.trim(),
+      password: $("loginPassword").value
+    });
+    if (error) throw error;
+
+    $("loginForm").reset();
+    $("loginPanel").classList.add("hidden");
+    setStatus("loginMessage", "");
+    await refreshAuth();
+  } catch (error) {
+    setStatus("loginMessage", "เข้าสู่ระบบไม่สำเร็จ: " + error.message);
+  } finally {
+    setBusy(false);
+  }
+});
+
+$("logoutBtn").addEventListener("click", async () => {
+  const {error} = await db.auth.signOut();
+  if (error) {
+    alert("ออกจากระบบไม่สำเร็จ: " + error.message);
+    return;
+  }
+  await refreshAuth();
+});
+
+async function refreshAuth() {
+  const {data, error} = await db.auth.getSession();
+
+  if (error) {
+    setStatus("authStatus", "ตรวจสอบสถานะเข้าสู่ระบบไม่สำเร็จ");
     return;
   }
 
-  event.target.reset();
+  const user = data.session?.user;
+  isOwner = Boolean(user && user.id === OWNER_UID);
+
+  $("adminPanel").classList.toggle("hidden", !isOwner);
+  $("logoutBtn").classList.toggle("hidden", !user);
+  $("showLogin").classList.toggle("hidden", Boolean(user));
+
+  if (isOwner) {
+    setStatus("authStatus", "♡ เข้าสู่ระบบเจ้าของเว็บแล้ว");
+  } else if (user) {
+    setStatus("authStatus", "บัญชีนี้ไม่มีสิทธิ์จัดการสินค้า");
+  } else {
+    setStatus("authStatus", "ผู้เข้าชม · ดูสินค้าได้โดยไม่ต้องเข้าสู่ระบบ");
+  }
+
+  await loadProducts();
+}
+
+async function loadProducts() {
+  setStatus("listStatus", "กำลังโหลดสินค้า...");
+  const {data, error} = await db
+    .from("products")
+    .select("id, platform, name, product_url, price, scan_amount, image_url, created_at")
+    .order("created_at", {ascending:false});
+
+  if (error) {
+    products = [];
+    render();
+    setStatus("listStatus", "โหลดสินค้าไม่สำเร็จ: " + error.message);
+    return;
+  }
+
+  products = data || [];
+  setStatus("listStatus", products.length ? "" : "ยังไม่มีสินค้าในฐานข้อมูล");
   render();
+}
+
+$("productForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!isOwner || busy) return;
+
+  const item = {
+    platform: current,
+    name: $("productName").value.trim(),
+    product_url: $("productUrl").value.trim(),
+    price: Number($("productPrice").value),
+    scan_amount: Number($("receivePrice").value),
+    image_url: $("productImage").value.trim() || null
+  };
+
+  if (!item.name || !item.product_url ||
+      !Number.isFinite(item.price) || item.price < 0 ||
+      !Number.isFinite(item.scan_amount) || item.scan_amount < 0) {
+    setStatus("formMessage", "กรุณาตรวจสอบชื่อ ลิงก์ และจำนวนเงิน");
+    return;
+  }
+
+  setBusy(true);
+  setStatus("formMessage", "กำลังบันทึก...");
+
+  try {
+    let result;
+
+    if (editingId !== null) {
+      result = await db.from("products")
+        .update(item)
+        .eq("id", editingId)
+        .select();
+    } else {
+      result = await db.from("products")
+        .insert(item)
+        .select();
+    }
+
+    if (result.error) throw result.error;
+
+    resetProductForm();
+    await loadProducts();
+    setStatus("formMessage", "บันทึกเรียบร้อยแล้ว ♡");
+  } catch (error) {
+    setStatus("formMessage", "บันทึกไม่สำเร็จ: " + error.message);
+  } finally {
+    setBusy(false);
+  }
 });
+
+function startEdit(p) {
+  if (!isOwner) return;
+
+  editingId = p.id;
+  current = p.platform;
+
+  document.querySelectorAll(".tab").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.platform === current);
+  });
+
+  $("productName").value = p.name || "";
+  $("productUrl").value = p.product_url || "";
+  $("productPrice").value = p.price ?? 0;
+  $("receivePrice").value = p.scan_amount ?? 0;
+  $("productImage").value = p.image_url || "";
+  $("formTitle").textContent = "แก้ไขสินค้า · " + platforms[current].name;
+  $("listTitle").textContent = "สินค้าจาก " + platforms[current].name;
+  $("saveBtn").textContent = "บันทึกการแก้ไข";
+  $("cancelEditBtn").classList.remove("hidden");
+  setStatus("formMessage", "แก้ไขข้อมูลแล้วกดบันทึกการแก้ไข");
+  $("adminPanel").scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+async function deleteProduct(p) {
+  if (!isOwner) return;
+  if (!confirm("ต้องการลบสินค้า " + p.name + " หรือไม่?")) return;
+
+  const {error} = await db.from("products").delete().eq("id", p.id);
+
+  if (error) {
+    alert("ลบไม่สำเร็จ: " + error.message);
+    return;
+  }
+
+  if (editingId === p.id) resetProductForm();
+  await loadProducts();
+}
 
 function render() {
   const list = $("productList");
   list.replaceChildren();
+
   const filtered = products.filter(p => p.platform === current);
 
   if (!filtered.length) {
     const empty = document.createElement("div");
     empty.className = "empty";
-    empty.textContent = "ยังไม่มีสินค้า ♡ กดเพิ่มสินค้าได้เลย";
+    empty.textContent = "ยังไม่มีสินค้าในหมวดนี้ ♡";
     list.append(empty);
     return;
   }
@@ -184,12 +412,13 @@ function render() {
     const card = document.createElement("article");
     card.className = "product";
 
-    if (p.image) {
+    if (p.image_url) {
       const img = document.createElement("img");
-      img.src = p.image;
+      img.src = p.image_url;
       img.alt = p.name;
       img.loading = "lazy";
-      img.style.cssText = "width:100px;height:100px;object-fit:contain;border-radius:12px;float:right";
+      img.style.cssText =
+        "width:100px;height:100px;object-fit:contain;border-radius:12px;float:right";
       img.onerror = () => img.remove();
       card.append(img);
     }
@@ -205,45 +434,45 @@ function render() {
 
     const receive = document.createElement("p");
     receive.className = "receive";
-    receive.textContent = "ยอดรับ " + money(p.receive) + " บาท";
+    receive.textContent = "ยอดรับ " + money(p.scan_amount) + " บาท";
     card.append(receive);
 
     const link = document.createElement("a");
-    link.href = p.url;
+    link.href = p.product_url;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
     link.textContent = "เปิดหน้าสินค้า ↗";
     card.append(link);
 
-    const actions = document.createElement("div");
-    actions.className = "actions";
+    if (isOwner) {
+      const actions = document.createElement("div");
+      actions.className = "actions";
 
-    const edit = document.createElement("button");
-    edit.textContent = "แก้ไขยอดรับ";
-    edit.addEventListener("click", () => {
-      const value = prompt("ใส่ยอดรับเงินใหม่ (บาท)", p.receive);
-      if (value === null || value.trim() === "" || !Number.isFinite(Number(value)) || Number(value) < 0) return;
-      p.receive = Number(value);
-      save();
-      render();
-    });
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.textContent = "แก้ไขสินค้า";
+      edit.addEventListener("click", () => startEdit(p));
 
-    const remove = document.createElement("button");
-    remove.textContent = "ลบสินค้า";
-    remove.addEventListener("click", () => {
-      if (!confirm("ต้องการลบสินค้านี้หรือไม่?")) return;
-      products = products.filter(item => item.id !== p.id);
-      save();
-      render();
-    });
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.textContent = "ลบสินค้า";
+      remove.addEventListener("click", () => deleteProduct(p));
 
-    actions.append(edit, remove);
-    card.append(actions);
+      actions.append(edit, remove);
+      card.append(actions);
+    }
+
     list.append(card);
   });
 }
 
-render();
+/* ติดตามการเข้าสู่ระบบและออกจากระบบ */
+db.auth.onAuthStateChange(() => {
+  setTimeout(() => refreshAuth(), 0);
+});
+
+/* เริ่มต้นเว็บ */
+refreshAuth();
 </script>
 </body>
 </html>
