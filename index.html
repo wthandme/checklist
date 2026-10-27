@@ -1,0 +1,249 @@
+
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>wthandme ♡ Price Checker</title>
+<style>
+:root {
+  --pink:#f8d9e7;
+  --purple:#e8dfff;
+  --blue:#ddf2f8;
+  --mint:#d8f0e5;
+  --ink:#68475a;
+  --muted:#a58a9b;
+  --bg:#fff7fb;
+}
+* { box-sizing:border-box; }
+body {
+  margin:0; padding:24px 14px;
+  font-family:Arial,sans-serif;
+  background:linear-gradient(140deg,#fff4f8,#f7f3ff,#f1fafc);
+  color:var(--ink);
+}
+main { max-width:760px; margin:auto; }
+header { text-align:center; margin:15px 0 24px; }
+h1 { margin:0 0 8px; font-size:30px; }
+header p { color:var(--muted); }
+.tabs { display:flex; gap:9px; margin-bottom:20px; }
+.tab {
+  flex:1; padding:13px 5px; border:0; border-radius:16px;
+  font-size:16px; font-weight:bold; cursor:pointer;
+  color:var(--ink); background:white;
+}
+.tab.active { outline:2px solid #dba5c0; }
+.tab:nth-child(1) { background:var(--pink); }
+.tab:nth-child(2) { background:var(--purple); }
+.tab:nth-child(3) { background:var(--blue); }
+.panel,.product {
+  background:#fff; border:1px solid #f1e2eb;
+  border-radius:20px; padding:18px; margin-bottom:15px;
+  box-shadow:0 5px 18px #d9b8cc20;
+}
+label { display:block; margin:12px 0 6px; font-size:14px; }
+input {
+  width:100%; padding:12px; border:1px solid #ecdce6;
+  border-radius:12px; font-size:15px; background:#fffafd;
+}
+button.primary {
+  background:#d987ad; color:white; border:0; border-radius:12px;
+  padding:12px 16px; cursor:pointer; font-weight:bold;
+}
+.full { width:100%; margin-top:15px; }
+.product h3 { margin:0 0 8px; overflow-wrap:anywhere; }
+.product a { color:#9971bd; overflow-wrap:anywhere; }
+.price { color:#9874be; }
+.receive { color:#399779; font-size:20px; font-weight:bold; }
+.meta { color:var(--muted); font-size:13px; }
+.actions { display:flex; gap:8px; margin-top:12px; }
+.actions button {
+  border:0; border-radius:10px; padding:9px 12px;
+  background:#f7e9f1; color:var(--ink); cursor:pointer;
+}
+.empty { text-align:center; color:var(--muted); padding:24px; }
+.hidden { display:none; }
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>♡ wthandme ♡</h1>
+  <p>Pastel Price Checker · เช็กราคาสินค้าสุดคิวต์</p>
+</header>
+
+<div class="tabs">
+  <button class="tab active" data-platform="shopee">🧡 ชป.</button>
+  <button class="tab" data-platform="lazada">💜 ลซด.</button>
+  <button class="tab" data-platform="tiktok">🩵 ตต.</button>
+</div>
+
+<section class="panel">
+  <h2 id="formTitle">เพิ่มสินค้า · Shopee</h2>
+  <form id="productForm">
+    <label for="productName">ชื่อสินค้า</label>
+    <input id="productName" placeholder="เช่น AirPods" required>
+
+    <label for="productUrl">ลิงก์สินค้า</label>
+    <input id="productUrl" type="url" placeholder="https://..." required>
+
+    <label for="productPrice">ราคาสินค้า (บาท)</label>
+    <input id="productPrice" type="number" min="0" step="0.01" placeholder="4550" required>
+
+    <label for="receivePrice">ยอดรับเงิน (บาท)</label>
+    <input id="receivePrice" type="number" min="0" step="0.01" placeholder="3200" required>
+
+    <label for="productImage">ลิงก์รูปสินค้า (ถ้ามี)</label>
+    <input id="productImage" type="url" placeholder="https://.../image.jpg">
+
+    <button class="primary full" type="submit">♡ บันทึกสินค้า</button>
+  </form>
+</section>
+
+<h2 id="listTitle">สินค้าจาก Shopee</h2>
+<div id="productList"></div>
+</main>
+
+<script>
+const platforms = {
+  shopee: {name:"Shopee", title:"ชป."},
+  lazada: {name:"Lazada", title:"ลซด."},
+  tiktok: {name:"TikTok Shop", title:"ตต."}
+};
+let current = "shopee";
+let products = [];
+
+try {
+  products = JSON.parse(localStorage.getItem("wthandme-products") || "[]");
+  if (!Array.isArray(products)) products = [];
+} catch {
+  products = [];
+}
+
+const $ = id => document.getElementById(id);
+const money = n => Number(n).toLocaleString("th-TH", {
+  maximumFractionDigits:2
+});
+
+function save() {
+  localStorage.setItem("wthandme-products", JSON.stringify(products));
+}
+
+function switchTab(platform) {
+  current = platform;
+  document.querySelectorAll(".tab").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.platform === current);
+  });
+  $("formTitle").textContent = "เพิ่มสินค้า · " + platforms[current].name;
+  $("listTitle").textContent = "สินค้าจาก " + platforms[current].name;
+  render();
+}
+
+document.querySelectorAll(".tab").forEach(btn => {
+  btn.addEventListener("click", () => switchTab(btn.dataset.platform));
+});
+
+$("productForm").addEventListener("submit", event => {
+  event.preventDefault();
+
+  products.unshift({
+    id: Date.now().toString() + Math.random().toString(36).slice(2),
+    platform: current,
+    name: $("productName").value.trim(),
+    url: $("productUrl").value.trim(),
+    price: Number($("productPrice").value),
+    receive: Number($("receivePrice").value),
+    image: $("productImage").value.trim()
+  });
+
+  try {
+    save();
+  } catch {
+    alert("บันทึกไม่สำเร็จ พื้นที่จัดเก็บของเบราว์เซอร์อาจเต็ม");
+    return;
+  }
+
+  event.target.reset();
+  render();
+});
+
+function render() {
+  const list = $("productList");
+  list.replaceChildren();
+  const filtered = products.filter(p => p.platform === current);
+
+  if (!filtered.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "ยังไม่มีสินค้า ♡ กดเพิ่มสินค้าได้เลย";
+    list.append(empty);
+    return;
+  }
+
+  filtered.forEach(p => {
+    const card = document.createElement("article");
+    card.className = "product";
+
+    if (p.image) {
+      const img = document.createElement("img");
+      img.src = p.image;
+      img.alt = p.name;
+      img.loading = "lazy";
+      img.style.cssText = "width:100px;height:100px;object-fit:contain;border-radius:12px;float:right";
+      img.onerror = () => img.remove();
+      card.append(img);
+    }
+
+    const title = document.createElement("h3");
+    title.textContent = p.name;
+    card.append(title);
+
+    const price = document.createElement("p");
+    price.className = "price";
+    price.textContent = "ราคาสินค้า " + money(p.price) + " บาท";
+    card.append(price);
+
+    const receive = document.createElement("p");
+    receive.className = "receive";
+    receive.textContent = "ยอดรับ " + money(p.receive) + " บาท";
+    card.append(receive);
+
+    const link = document.createElement("a");
+    link.href = p.url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = "เปิดหน้าสินค้า ↗";
+    card.append(link);
+
+    const actions = document.createElement("div");
+    actions.className = "actions";
+
+    const edit = document.createElement("button");
+    edit.textContent = "แก้ไขยอดรับ";
+    edit.addEventListener("click", () => {
+      const value = prompt("ใส่ยอดรับเงินใหม่ (บาท)", p.receive);
+      if (value === null || value.trim() === "" || !Number.isFinite(Number(value)) || Number(value) < 0) return;
+      p.receive = Number(value);
+      save();
+      render();
+    });
+
+    const remove = document.createElement("button");
+    remove.textContent = "ลบสินค้า";
+    remove.addEventListener("click", () => {
+      if (!confirm("ต้องการลบสินค้านี้หรือไม่?")) return;
+      products = products.filter(item => item.id !== p.id);
+      save();
+      render();
+    });
+
+    actions.append(edit, remove);
+    card.append(actions);
+    list.append(card);
+  });
+}
+
+render();
+</script>
+</body>
+</html>
